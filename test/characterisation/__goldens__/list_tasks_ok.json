@@ -1,0 +1,10 @@
+{
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"kind\": \"tasks#tasks\",\n  \"etag\": \"\\\"PLANTED_ETAG\\\"\",\n  \"nextPageToken\": \"P2\",\n  \"items\": [\n    {\n      \"kind\": \"tasks#task\",\n      \"id\": \"PLANTED_TASK_1\",\n      \"etag\": \"\\\"PLANTED_ETAG\\\"\",\n      \"title\": \"Task 1\",\n      \"updated\": \"2026-10-16T09:30:00.000Z\",\n      \"updated_readable\": \"10/16/2026, 9:30:00 AM\",\n      \"selfLink\": \"https://www.googleapis.com/tasks/v1/lists/PLANTED_LIST_1/tasks/PLANTED_TASK_1\",\n      \"position\": \"00000000000000000001\",\n      \"status\": \"needsAction\",\n      \"due\": \"2026-10-20T00:00:00.000Z\",\n      \"due_readable\": \"10/20/2026, 12:00:00 AM\",\n      \"links\": [],\n      \"webViewLink\": \"https://tasks.google.com/task/PLANTED_TASK_1\"\n    },\n    {\n      \"kind\": \"tasks#task\",\n      \"id\": \"PLANTED_TASK_2\",\n      \"etag\": \"\\\"PLANTED_ETAG\\\"\",\n      \"title\": \"Task 2\",\n      \"updated\": \"2026-10-16T09:30:00.000Z\",\n      \"updated_readable\": \"10/16/2026, 9:30:00 AM\",\n      \"selfLink\": \"https://www.googleapis.com/tasks/v1/lists/PLANTED_LIST_1/tasks/PLANTED_TASK_2\",\n      \"position\": \"00000000000000000002\",\n      \"status\": \"completed\",\n      \"due\": \"2026-10-20T00:00:00.000Z\",\n      \"due_readable\": \"10/20/2026, 12:00:00 AM\",\n      \"links\": [],\n      \"webViewLink\": \"https://tasks.google.com/task/PLANTED_TASK_2\",\n      \"completed\": \"2026-10-15T08:00:00.000Z\",\n      \"completed_readable\": \"10/15/2026, 8:00:00 AM\",\n      \"hidden\": true\n    }\n  ]\n}\n\n⚠️ COMPLETED TASKS: You set showCompleted=true but showHidden is not true. Tasks completed in the web UI or mobile apps will NOT be visible. To see all completed tasks, you must set BOTH showCompleted=true AND showHidden=true."
+      }
+    ]
+  }
+}

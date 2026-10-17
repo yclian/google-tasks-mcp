@@ -1,0 +1,11 @@
+{
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Error: Unexpected end of JSON input"
+      }
+    ],
+    "isError": true
+  }
+}

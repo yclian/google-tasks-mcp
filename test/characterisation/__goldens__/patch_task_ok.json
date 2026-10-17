@@ -1,0 +1,26 @@
+{
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": {
+          "__json": {
+            "kind": "tasks#task",
+            "id": "PLANTED_TASK_1",
+            "etag": "\"PLANTED_ETAG\"",
+            "title": "Patched",
+            "updated": "2026-10-16T09:30:00.000Z",
+            "updated_readable": "10/16/2026, 9:30:00 AM",
+            "selfLink": "https://www.googleapis.com/tasks/v1/lists/PLANTED_LIST_1/tasks/PLANTED_TASK_1",
+            "position": "00000000000000000001",
+            "status": "needsAction",
+            "due": "2026-10-20T00:00:00.000Z",
+            "due_readable": "10/20/2026, 12:00:00 AM",
+            "links": [],
+            "webViewLink": "https://tasks.google.com/task/PLANTED_TASK_1"
+          }
+        }
+      }
+    ]
+  }
+}
