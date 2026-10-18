@@ -3,8 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { registerAllTools } from "../tools/index.ts";
 import type { AppDeps } from "../deps.ts";
-import type { TokenStore } from "../auth/token-store.ts";
-import { createLegacyGoogleClient } from "../google/client.ts";
+import type { GoogleTokenProvider } from "../google/client.ts";
 import { createLogger } from "../utils/logger.ts";
 
 const logger = createLogger({ component: "mcp-endpoints" });
@@ -13,8 +12,8 @@ const logger = createLogger({ component: "mcp-endpoints" });
  * POST /mcp: stateless Streamable HTTP. Each request gets its own server and
  * transport, so any instance can serve any request (no sessions, no SSE).
  */
-export const handleMcpPost = (deps: AppDeps, tokenStore: TokenStore) => async (c: Context) => {
-  const mcpToken = c.get("mcpToken") as string;
+export const handleMcpPost = (_deps: AppDeps, google: GoogleTokenProvider) => async (c: Context) => {
+  const grantId = c.get("grantId") as string;
 
   const server = new McpServer(
     {
@@ -27,7 +26,7 @@ export const handleMcpPost = (deps: AppDeps, tokenStore: TokenStore) => async (c
       },
     },
   );
-  registerAllTools(server, createLegacyGoogleClient(deps, tokenStore, mcpToken));
+  registerAllTools(server, google.clientFor(grantId));
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,

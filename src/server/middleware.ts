@@ -1,15 +1,23 @@
 import { Context, Next } from "hono";
 import type { TokenStore } from "../auth/token-store.ts";
+import type { AppDeps } from "../deps.ts";
+import { resourceMetadataUrl } from "../auth/issuer.ts";
+import { GrantRevokedError, type GoogleTokenProvider } from "../google/client.ts";
 import { createLogger } from "../utils/logger.ts";
 
 const logger = createLogger({ component: "middleware" });
 
-export function authenticateBearer(tokenStore: TokenStore) {
+export function authenticateBearer(deps: Pick<AppDeps, "config">, tokenStore: TokenStore, google: GoogleTokenProvider) {
+  // MCP auth spec: every 401 points the client at the protected-resource metadata.
+  const challenge = (c: Context) => {
+    c.header("WWW-Authenticate", `Bearer resource_metadata="${resourceMetadataUrl(deps, c.req.raw)}"`);
+  };
   return async (c: Context, next: Next) => {
     const authHeader = c.req.header("Authorization");
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       logger.warn("Authentication failed: missing or invalid Authorization header");
+      challenge(c);
       return c.json(
         {
           error: "unauthorized",
@@ -21,9 +29,21 @@ export function authenticateBearer(tokenStore: TokenStore) {
 
     const token = authHeader.substring(7);
 
-    const isValid = await tokenStore.isValid(token);
-    if (!isValid) {
+    const resolved = await tokenStore.resolveAccess(token);
+    let revoked = !resolved;
+    if (resolved) {
+      // Refresh Google's token up front, so a grant Google has revoked answers
+      // 401 (client re-authorizes) instead of a tool error. Other failures are
+      // left for the tool call to report.
+      try {
+        await google.accessTokenFor(resolved.grantId);
+      } catch (error) {
+        if (error instanceof GrantRevokedError) revoked = true;
+      }
+    }
+    if (revoked) {
       logger.warn("Authentication failed: invalid or expired token");
+      challenge(c);
       return c.json(
         {
           error: "unauthorized",
@@ -33,7 +53,7 @@ export function authenticateBearer(tokenStore: TokenStore) {
       );
     }
 
-    c.set("mcpToken", token);
+    c.set("grantId", resolved!.grantId);
 
     await next();
   };

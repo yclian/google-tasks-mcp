@@ -1,18 +1,21 @@
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { readFile } from "node:fs/promises";
 import { createOAuthRouter } from "../auth/oauth.ts";
 import { createTokenStore } from "../auth/token-store.ts";
+import { createGoogleTokenProvider } from "../google/client.ts";
 import type { AppDeps } from "../deps.ts";
 import { authenticateBearer } from "./middleware.ts";
+import { issuer, MCP_PATH, PRM_PATH } from "../auth/issuer.ts";
 import { handleMcpMethodNotAllowed, handleMcpPost } from "./mcp-endpoints.ts";
 
-const MCP_ENDPOINT = "/mcp";
+const MCP_ENDPOINT = MCP_PATH;
 
 export function createApp(deps: AppDeps) {
   const app = new Hono();
   const tokenStore = createTokenStore(deps);
-  const requireBearer = authenticateBearer(tokenStore);
+  const google = createGoogleTokenProvider(deps, tokenStore);
+  const requireBearer = authenticateBearer(deps, tokenStore, google);
 
   app.use("*", async (c, next) => {
     await next();
@@ -56,7 +59,12 @@ export function createApp(deps: AppDeps) {
     maxAge: 86400,
   }));
 
+  const publicPages = deps.config.publicPages;
+
   app.get("/", async (c) => {
+    if (!publicPages) {
+      return c.json({ message: "Google Tasks MCP Server" });
+    }
     try {
       const html = await readFile("./public/index.html", "utf-8");
       c.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' https://www.googletagmanager.com; connect-src https://www.google-analytics.com; frame-ancestors 'none'");
@@ -74,12 +82,24 @@ export function createApp(deps: AppDeps) {
     return c.redirect(url.toString());
   });
 
-  app.post(MCP_ENDPOINT, requireBearer, handleMcpPost(deps, tokenStore));
+  app.post(MCP_ENDPOINT, requireBearer, handleMcpPost(deps, google));
   app.get(MCP_ENDPOINT, requireBearer, handleMcpMethodNotAllowed);
   app.delete(MCP_ENDPOINT, requireBearer, handleMcpMethodNotAllowed);
 
+  // Protected-resource metadata, at the origin and at the /mcp path suffix.
+  const protectedResource = (c: Context) => {
+    const base = issuer(deps, c.req.raw);
+    return c.json({
+      resource: `${base}${MCP_ENDPOINT}`,
+      authorization_servers: [base],
+      bearer_methods_supported: ["header"],
+    });
+  };
+  app.get(PRM_PATH, protectedResource);
+  app.get(`${PRM_PATH}${MCP_ENDPOINT}`, protectedResource);
+
   app.get("/.well-known/oauth-authorization-server", (c) => {
-    const baseUrl = new URL(c.req.url).origin;
+    const baseUrl = issuer(deps, c.req.raw);
     return c.json({
       issuer: baseUrl,
       authorization_endpoint: `${baseUrl}/authorize`,
@@ -103,6 +123,9 @@ export function createApp(deps: AppDeps) {
   });
 
   app.get("/privacy-policy", async (c) => {
+    if (!publicPages) {
+      return c.notFound();
+    }
     try {
       const html = await readFile("./public/privacy-policy.html", "utf-8");
       c.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' https://www.googletagmanager.com; connect-src https://www.google-analytics.com; frame-ancestors 'none'");
@@ -113,6 +136,9 @@ export function createApp(deps: AppDeps) {
   });
 
   app.get("/health", async (c) => {
+    if (!publicPages) {
+      return c.json({ status: "ok" });
+    }
     try {
       const html = await readFile("./public/health.html", "utf-8");
       c.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' https://www.googletagmanager.com; connect-src https://www.google-analytics.com; frame-ancestors 'none'");

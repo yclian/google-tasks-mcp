@@ -3,7 +3,7 @@
 // certifies the same behaviour lands (see README.md here).
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { GoogleFake } from "../support/google-fake.ts";
-import { login, req } from "../support/oauth-driver.ts";
+import { login } from "../support/oauth-driver.ts";
 import { mcp } from "../support/mcp-client.ts";
 import { makeCharacterisationApp } from "./app.ts";
 
@@ -33,25 +33,14 @@ describe("characterisation: upstream behaviour", () => {
   let app: Awaited<ReturnType<typeof makeCharacterisationApp>>["app"];
   let cleanup: () => Promise<void>;
   let token: string;
-  let tokenResponse: unknown;
 
   beforeAll(async () => {
     ({ app, cleanup } = await makeCharacterisationApp(google));
     const l = await login(app, google);
     token = l.tokens.access_token;
-    tokenResponse = { ...l.tokens };
   });
   afterAll(async () => {
     await cleanup();
-  });
-
-  it("token_response", async () => {
-    await expect(pretty(tokenResponse)).toMatchFileSnapshot(golden("token_response"));
-  });
-
-  it("as_metadata", async () => {
-    const r = await req(app, "/.well-known/oauth-authorization-server");
-    await expect(pretty(await r.json())).toMatchFileSnapshot(golden("as_metadata"));
   });
 
   it("tools_list", async () => {

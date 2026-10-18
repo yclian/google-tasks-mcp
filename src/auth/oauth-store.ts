@@ -8,11 +8,15 @@ export interface OAuthSession {
   clientId?: string;
 }
 
+/** Issued at /callback after Google's code exchange; redeemed once at /token. */
 export interface AuthCode {
-  googleCode: string;
-  clientId?: string;
+  clientId: string;
   redirectUri: string;
   codeChallenge?: string;
+  email?: string;
+  encGoogleAccess: string;
+  encGoogleRefresh: string;
+  googleExpiresAt: number;
 }
 
 export interface RegisteredClient {
@@ -33,8 +37,8 @@ export function createOAuthStore(deps: Pick<AppDeps, "store">) {
     getSession: (sessionId: string) => store.get<OAuthSession>(["oauth_sessions", sessionId]),
     deleteSession: (sessionId: string) => store.delete(["oauth_sessions", sessionId]),
     storeAuthCode: (code: string, data: AuthCode) => store.set(["auth_codes", code], data, { ttlMs: TEN_MINUTES }),
-    getAuthCode: (code: string) => store.get<AuthCode>(["auth_codes", code]),
-    deleteAuthCode: (code: string) => store.delete(["auth_codes", code]),
+    /** single use: the first caller gets the code, every later caller null */
+    takeAuthCode: (code: string) => store.take<AuthCode>(["auth_codes", code]),
     registerClient: (clientId: string, client: RegisteredClient) => store.set(["clients", clientId], client),
     getClient: (clientId: string) => store.get<RegisteredClient>(["clients", clientId]),
   };
