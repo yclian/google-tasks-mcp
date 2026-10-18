@@ -216,6 +216,23 @@ deployctl deploy --project=google-tasks-mcp build/index.js
    - Add all required environment variables
    - Restart the deployment
 
+#### Run on Node / in a container
+
+```bash
+npm run build
+KV_PATH=./data/kv.sqlite npm start   # serves build/node.js on $PORT
+```
+
+Set `KV_PATH` on Node: without it Deno KV is **in memory** and every restart
+logs everyone out. A `Dockerfile` is included.
+
+#### Deploy to Google Cloud (Cloud Run + Firestore + KMS)
+
+For a shared, multi-user server restricted to a Google Workspace domain, see
+[DEPLOY.md](DEPLOY.md) (Terraform in `infra/`) and [MAINTAIN.md](MAINTAIN.md)
+(configuration, token model, revoking access). All new settings are optional;
+without them the server behaves as before.
+
 ### Step 5: Update Google OAuth Settings
 
 Go back to your Google Cloud Console OAuth client and update the redirect URI to match your deployed URL:
