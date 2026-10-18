@@ -10,7 +10,8 @@
     "generate-secret": "node -e \"console.log('ENCRYPTION_SECRET=' + require('crypto').randomBytes(32).toString('hex'))\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.test.json"
+    "typecheck": "tsc -p tsconfig.test.json",
+    "start": "node build/node.js"
   },
   "keywords": [
     "mcp",

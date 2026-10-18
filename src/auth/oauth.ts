@@ -1,8 +1,9 @@
 import { Buffer } from "node:buffer";
 import { Hono } from "hono";
-import { tokenStore } from "./token-store.ts";
 import crypto from "node:crypto";
-import { openKv } from "@deno/kv";
+import type { AppDeps } from "../deps.ts";
+import { createOAuthStore } from "./oauth-store.ts";
+import type { TokenStore } from "./token-store.ts";
 import { createLogger } from "../utils/logger.ts";
 import { rateLimit } from "../server/rate-limiter.ts";
 
@@ -17,80 +18,6 @@ export interface OAuthConfig {
   redirectUri: string;
 }
 
-interface OAuthSession {
-  state: string;
-  codeChallenge?: string;
-  codeChallengeMethod?: string;
-  redirectUri: string;
-  clientId?: string;
-}
-
-interface AuthCode {
-  googleCode: string;
-  clientId?: string;
-  redirectUri: string;
-  codeChallenge?: string;
-}
-
-interface RegisteredClient {
-  clientId: string;
-  clientSecret?: string;
-  redirectUris: string[];
-}
-
-class OAuthStore {
-  private kv: Awaited<ReturnType<typeof openKv>> | null = null;
-
-  async init() {
-    this.kv = await openKv();
-  }
-
-  async storeSession(sessionId: string, session: OAuthSession): Promise<void> {
-    if (!this.kv) throw new Error("KV not initialized");
-    await this.kv.set(["oauth_sessions", sessionId], session, { expireIn: 600000 });
-  }
-
-  async getSession(sessionId: string): Promise<OAuthSession | null> {
-    if (!this.kv) throw new Error("KV not initialized");
-    const result = await this.kv.get<OAuthSession>(["oauth_sessions", sessionId]);
-    return result.value;
-  }
-
-  async deleteSession(sessionId: string): Promise<void> {
-    if (!this.kv) throw new Error("KV not initialized");
-    await this.kv.delete(["oauth_sessions", sessionId]);
-  }
-
-  async storeAuthCode(code: string, data: AuthCode): Promise<void> {
-    if (!this.kv) throw new Error("KV not initialized");
-    await this.kv.set(["auth_codes", code], data, { expireIn: 600000 });
-  }
-
-  async getAuthCode(code: string): Promise<AuthCode | null> {
-    if (!this.kv) throw new Error("KV not initialized");
-    const result = await this.kv.get<AuthCode>(["auth_codes", code]);
-    return result.value;
-  }
-
-  async deleteAuthCode(code: string): Promise<void> {
-    if (!this.kv) throw new Error("KV not initialized");
-    await this.kv.delete(["auth_codes", code]);
-  }
-
-  async registerClient(clientId: string, client: RegisteredClient): Promise<void> {
-    if (!this.kv) throw new Error("KV not initialized");
-    await this.kv.set(["clients", clientId], client);
-  }
-
-  async getClient(clientId: string): Promise<RegisteredClient | null> {
-    if (!this.kv) throw new Error("KV not initialized");
-    const result = await this.kv.get<RegisteredClient>(["clients", clientId]);
-    return result.value;
-  }
-}
-
-const oauthStore = new OAuthStore();
-
 function base64URLEncode(str: Buffer): string {
   return str.toString('base64')
     .replace(/\+/g, '-')
@@ -102,16 +29,14 @@ function sha256(buffer: string): Buffer {
   return crypto.createHash('sha256').update(buffer).digest();
 }
 
-export async function initOAuthStore() {
-  await oauthStore.init();
-}
-
-export function createOAuthRouter(config: OAuthConfig) {
+export function createOAuthRouter(deps: AppDeps, tokenStore: TokenStore) {
+  const config = deps.config.google;
+  const oauthStore = createOAuthStore(deps);
   const oauth = new Hono();
 
   oauth.post(
     "/register",
-    rateLimit({ maxRequests: 30, windowMs: 3600000 }),
+    rateLimit(deps, { maxRequests: 30, windowMs: 3600000 }),
     async (c) => {
       const body = await c.req.json();
       const clientId = crypto.randomUUID();
@@ -132,7 +57,7 @@ export function createOAuthRouter(config: OAuthConfig) {
 
   oauth.get(
     "/authorize",
-    rateLimit({ maxRequests: 60, windowMs: 3600000 }),
+    rateLimit(deps, { maxRequests: 60, windowMs: 3600000 }),
     async (c) => {
     const responseType = c.req.query("response_type");
     const clientId = c.req.query("client_id");
@@ -218,7 +143,7 @@ export function createOAuthRouter(config: OAuthConfig) {
 
   oauth.post(
     "/token",
-    rateLimit({ maxRequests: 100, windowMs: 3600000 }),
+    rateLimit(deps, { maxRequests: 100, windowMs: 3600000 }),
     async (c) => {
     const body = await c.req.parseBody();
     const grantType = body.grant_type;
@@ -258,7 +183,7 @@ export function createOAuthRouter(config: OAuthConfig) {
     }
 
     try {
-      const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
+      const tokenResponse = await deps.fetch(GOOGLE_TOKEN_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -284,7 +209,7 @@ export function createOAuthRouter(config: OAuthConfig) {
       await tokenStore.storeTokens(mcpToken, {
         googleAccessToken: tokenData.access_token,
         googleRefreshToken: tokenData.refresh_token,
-        expiresAt: Date.now() + tokenData.expires_in * 1000,
+        expiresAt: deps.clock() + tokenData.expires_in * 1000,
       });
 
       await oauthStore.deleteAuthCode(code);
@@ -310,7 +235,8 @@ export function createOAuthRouter(config: OAuthConfig) {
 
 export async function refreshGoogleToken(
   refreshToken: string,
-  config: OAuthConfig
+  config: OAuthConfig,
+  fetchFn: typeof fetch,
 ): Promise<{
   accessToken: string;
   refreshToken: string;
@@ -318,7 +244,7 @@ export async function refreshGoogleToken(
 }> {
   logger.info("Refreshing Google access token");
 
-  const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
+  const tokenResponse = await fetchFn(GOOGLE_TOKEN_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",

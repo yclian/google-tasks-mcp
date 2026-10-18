@@ -3,6 +3,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { HonoSSETransport } from "../transport/mcp-transport.ts";
 import { registerAllTools } from "../tools/index.ts";
+import type { AppDeps } from "../deps.ts";
+import type { TokenStore } from "../auth/token-store.ts";
 import { createLogger } from "../utils/logger.ts";
 
 const logger = createLogger({ component: "mcp-endpoints" });
@@ -33,7 +35,7 @@ export function handleMcpGet(c: Context) {
   return new Response(readable, { headers });
 }
 
-export async function handleMcpPost(c: Context) {
+export const handleMcpPost = (deps: AppDeps, tokenStore: TokenStore) => async (c: Context) => {
   const mcpToken = c.get("mcpToken") as string;
 
   let message: JSONRPCMessage;
@@ -99,7 +101,7 @@ export async function handleMcpPost(c: Context) {
         },
       );
 
-      registerAllTools(sessionServer, mcpToken);
+      registerAllTools(sessionServer, { deps, tokenStore, mcpToken });
 
       await sessionServer.connect(transport);
       logger.info("MCP request handled statelessly via POST");
@@ -132,4 +134,4 @@ export async function handleMcpPost(c: Context) {
   };
 
   return new Response(readable, { headers });
-}
+};

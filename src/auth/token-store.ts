@@ -1,4 +1,4 @@
-import { openKv } from "@deno/kv";
+import type { AppDeps } from "../deps.ts";
 import { encrypt, decrypt } from "../utils/encryption.ts";
 
 export interface TokenData {
@@ -13,70 +13,47 @@ interface EncryptedTokenData {
   expiresAt: number;
 }
 
-class TokenStore {
-  private kv: Awaited<ReturnType<typeof openKv>> | null = null;
+const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-  async init() {
-    this.kv = await openKv();
-  }
+export type TokenStore = ReturnType<typeof createTokenStore>;
 
-  async storeTokens(mcpToken: string, tokenData: TokenData): Promise<void> {
-    if (!this.kv) throw new Error("KV not initialized");
-    const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+export function createTokenStore(deps: Pick<AppDeps, "store">) {
+  const { store } = deps;
 
+  async function storeTokens(mcpToken: string, tokenData: TokenData): Promise<void> {
     const encryptedData: EncryptedTokenData = {
       encryptedAccessToken: encrypt(tokenData.googleAccessToken),
       encryptedRefreshToken: encrypt(tokenData.googleRefreshToken),
       expiresAt: tokenData.expiresAt,
     };
-
-    await this.kv.set(["tokens", mcpToken], encryptedData, { expireIn: TTL_MS });
+    await store.set(["tokens", mcpToken], encryptedData, { ttlMs: TTL_MS });
   }
 
-  async getTokens(mcpToken: string): Promise<TokenData | null> {
-    if (!this.kv) throw new Error("KV not initialized");
-    const result = await this.kv.get<EncryptedTokenData>(["tokens", mcpToken]);
-
-    if (!result.value) {
+  async function getTokens(mcpToken: string): Promise<TokenData | null> {
+    const value = await store.get<EncryptedTokenData>(["tokens", mcpToken]);
+    if (!value) {
       return null;
     }
-
     return {
-      googleAccessToken: decrypt(result.value.encryptedAccessToken),
-      googleRefreshToken: decrypt(result.value.encryptedRefreshToken),
-      expiresAt: result.value.expiresAt,
+      googleAccessToken: decrypt(value.encryptedAccessToken),
+      googleRefreshToken: decrypt(value.encryptedRefreshToken),
+      expiresAt: value.expiresAt,
     };
   }
 
-  async isValid(mcpToken: string): Promise<boolean> {
-    const data = await this.getTokens(mcpToken);
-    return data !== null;
+  async function isValid(mcpToken: string): Promise<boolean> {
+    return (await getTokens(mcpToken)) !== null;
   }
 
-  async updateTokens(mcpToken: string, updates: Partial<TokenData>): Promise<void> {
-    if (!this.kv) throw new Error("KV not initialized");
-    const existing = await this.getTokens(mcpToken);
+  async function updateTokens(mcpToken: string, updates: Partial<TokenData>): Promise<void> {
+    const existing = await getTokens(mcpToken);
     if (!existing) throw new Error("Token not found");
-
-    const updatedData: TokenData = {
-      ...existing,
-      ...updates,
-    };
-
-    const encryptedData: EncryptedTokenData = {
-      encryptedAccessToken: encrypt(updatedData.googleAccessToken),
-      encryptedRefreshToken: encrypt(updatedData.googleRefreshToken),
-      expiresAt: updatedData.expiresAt,
-    };
-
-    const TTL_MS = 30 * 24 * 60 * 60 * 1000;
-    await this.kv.set(["tokens", mcpToken], encryptedData, { expireIn: TTL_MS });
+    await storeTokens(mcpToken, { ...existing, ...updates });
   }
 
-  async deleteToken(mcpToken: string): Promise<void> {
-    if (!this.kv) throw new Error("KV not initialized");
-    await this.kv.delete(["tokens", mcpToken]);
+  async function deleteToken(mcpToken: string): Promise<void> {
+    await store.delete(["tokens", mcpToken]);
   }
+
+  return { storeTokens, getTokens, isValid, updateTokens, deleteToken };
 }
-
-export const tokenStore = new TokenStore();

@@ -1,3 +1,4 @@
+import type { ApiAuth } from "../google/api.ts";
 import { z } from "zod";
 import {
   listTaskLists,
@@ -12,7 +13,7 @@ import { addReadableTimestamps } from "../utils/timestamp.ts";
 
 const logger = createLogger({ component: "tools:tasklists" });
 
-export function registerTaskListsTools(server: any, mcpAccessToken: string) {
+export function registerTaskListsTools(server: any, mcpAccessToken: ApiAuth) {
   server.registerTool(
     "list_task_lists",
     {

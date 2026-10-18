@@ -1,23 +1,18 @@
-import process from "node:process";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { readFile } from "node:fs/promises";
 import { createOAuthRouter } from "../auth/oauth.ts";
+import { createTokenStore } from "../auth/token-store.ts";
+import type { AppDeps } from "../deps.ts";
 import { authenticateBearer } from "./middleware.ts";
 import { handleMcpGet, handleMcpPost } from "./mcp-endpoints.ts";
 
-export interface ServerConfig {
-  oauthConfig: {
-    clientId: string;
-    clientSecret: string;
-    redirectUri: string;
-  };
-}
-
 const MCP_ENDPOINT = "/mcp";
 
-export function createApp(config: ServerConfig) {
+export function createApp(deps: AppDeps) {
   const app = new Hono();
+  const tokenStore = createTokenStore(deps);
+  const requireBearer = authenticateBearer(tokenStore);
 
   app.use("*", async (c, next) => {
     await next();
@@ -47,7 +42,7 @@ export function createApp(config: ServerConfig) {
         return origin;
       }
 
-      const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [];
+      const allowedOrigins = deps.config.allowedOrigins;
       if (allowedOrigins.includes(origin)) {
         return origin;
       }
@@ -71,7 +66,7 @@ export function createApp(config: ServerConfig) {
     }
   });
 
-  app.route("/", createOAuthRouter(config.oauthConfig));
+  app.route("/", createOAuthRouter(deps, tokenStore));
 
   app.get("/auth/callback", (c) => {
     const url = new URL(c.req.url);
@@ -79,8 +74,8 @@ export function createApp(config: ServerConfig) {
     return c.redirect(url.toString());
   });
 
-  app.get(MCP_ENDPOINT, authenticateBearer, handleMcpGet);
-  app.post(MCP_ENDPOINT, authenticateBearer, handleMcpPost);
+  app.get(MCP_ENDPOINT, requireBearer, handleMcpGet);
+  app.post(MCP_ENDPOINT, requireBearer, handleMcpPost(deps, tokenStore));
 
   app.get("/.well-known/oauth-authorization-server", (c) => {
     const baseUrl = new URL(c.req.url).origin;
