@@ -3,6 +3,7 @@ import type { TokenStore } from "../auth/token-store.ts";
 import type { AppDeps } from "../deps.ts";
 import { resourceMetadataUrl } from "../auth/issuer.ts";
 import { GrantRevokedError, type GoogleTokenProvider } from "../google/client.ts";
+import { BackendUnavailableError } from "../store/store.ts";
 import { createLogger } from "../utils/logger.ts";
 
 const logger = createLogger({ component: "middleware" });
@@ -39,6 +40,7 @@ export function authenticateBearer(deps: Pick<AppDeps, "config">, tokenStore: To
         await google.accessTokenFor(resolved.grantId);
       } catch (error) {
         if (error instanceof GrantRevokedError) revoked = true;
+        else if (error instanceof BackendUnavailableError) throw error; // → 503
       }
     }
     if (revoked) {

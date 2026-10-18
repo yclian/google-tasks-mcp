@@ -7,6 +7,10 @@ import { createGoogleTokenProvider } from "../google/client.ts";
 import type { AppDeps } from "../deps.ts";
 import { authenticateBearer } from "./middleware.ts";
 import { issuer, MCP_PATH, PRM_PATH } from "../auth/issuer.ts";
+import { BackendUnavailableError } from "../store/store.ts";
+import { createLogger } from "../utils/logger.ts";
+
+const logger = createLogger({ component: "app" });
 import { handleMcpMethodNotAllowed, handleMcpPost } from "./mcp-endpoints.ts";
 
 const MCP_ENDPOINT = MCP_PATH;
@@ -149,7 +153,11 @@ export function createApp(deps: AppDeps) {
   });
 
   app.onError((err, c) => {
-    console.error("Unhandled error:", err);
+    if (err instanceof BackendUnavailableError) {
+      logger.error("Backend unavailable", { backend: err.message });
+      return c.json({ error: "temporarily_unavailable", error_description: "Service temporarily unavailable. Please retry." }, 503);
+    }
+    logger.error("Unhandled error", { error: String(err) });
     return c.json({
       error: "internal_server_error",
       error_description: "An internal server error occurred. Please try again later."

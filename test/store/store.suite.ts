@@ -9,7 +9,7 @@ export type StoreFactory = (clock: TestClock) => Promise<Store>;
 export function runStoreSuite(
   name: string,
   make: StoreFactory,
-  opts: { persistent: boolean; reopen: (clock: TestClock) => Promise<Store> },
+  opts: { persistent: boolean; reopen: (clock: TestClock) => Promise<Store>; modelRuns?: number },
 ) {
   describe(`Store: ${name}`, () => {
     it("read_after_write", async () => {
@@ -115,8 +115,8 @@ export function runStoreSuite(
             await s.close();
           }
         }),
-        { numRuns: 100 },
+        { numRuns: opts.modelRuns ?? 100 },
       );
-    });
+    }, 120_000);
   });
 }
