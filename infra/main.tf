@@ -2,7 +2,7 @@ locals {
   name               = var.service_name
   firestore_location = coalesce(var.firestore_location, var.region)
   # Every collection the server writes with an expiry (see test/support/store-dump.ts).
-  ttl_collections = ["grants", "access", "refresh", "refresh_used", "grants_by_email", "oauth_sessions", "auth_codes", "rate_limit"]
+  ttl_collections = ["grants", "access", "refresh", "refresh_used", "grants_by_email", "revoked", "oauth_sessions", "auth_codes", "rate_limit"]
 }
 
 resource "google_project_service" "apis" {
@@ -169,16 +169,17 @@ resource "google_cloud_run_v2_service" "svc" {
 
       dynamic "env" {
         for_each = {
-          GOOGLE_REDIRECT_URI = "${var.issuer_url}/callback"
-          ISSUER_URL          = var.issuer_url
-          STORAGE             = "firestore"
-          FIRESTORE_DATABASE  = google_firestore_database.db.name
-          CIPHER              = "gcpkms"
-          KMS_KEY_NAME        = google_kms_crypto_key.tokens.id
-          ALLOWED_DOMAIN      = var.allowed_domain
-          TRUST_PROXY_HOPS    = "1"
-          PUBLIC_PAGES        = "false"
-          LOG_LEVEL           = "info"
+          GOOGLE_REDIRECT_URI   = "${var.issuer_url}/callback"
+          ISSUER_URL            = var.issuer_url
+          STORAGE               = "firestore"
+          FIRESTORE_DATABASE    = google_firestore_database.db.name
+          CIPHER                = "gcpkms"
+          KMS_KEY_NAME          = google_kms_crypto_key.tokens.id
+          ALLOWED_DOMAIN        = var.allowed_domain
+          ALLOWED_REDIRECT_URIS = join(",", var.allowed_redirect_uris)
+          TRUST_PROXY_HOPS      = "1"
+          PUBLIC_PAGES          = "false"
+          LOG_LEVEL             = "info"
         }
         content {
           name  = env.key

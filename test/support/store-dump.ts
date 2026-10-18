@@ -8,6 +8,7 @@ export const COLLECTIONS = [
   "refresh",
   "refresh_used",
   "grants_by_email",
+  "revoked",
   "oauth_sessions",
   "auth_codes",
   "clients",

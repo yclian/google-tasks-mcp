@@ -23,16 +23,26 @@ cd infra
 cp terraform.tfvars.example terraform.tfvars   # fill in
 cp backend.hcl.example backend.hcl             # fill in
 terraform init -backend-config=backend.hcl
+# First run: create the secrets before the service that reads them.
+terraform apply -var-file=terraform.tfvars -target=google_secret_manager_secret.google_oauth
+```
+
+Now add the OAuth client credentials (step 2), then come back and apply the rest:
+
+```bash
 terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 ```
+
+Cloud Run resolves the secrets at version `latest` when the first revision
+starts, so the full apply fails if the secrets have no versions yet.
 
 Creates: APIs, Artifact Registry, runtime and deployer service accounts,
 Firestore database with TTL policies, KMS key ring and key (90-day rotation),
 Secret Manager secrets (empty), Cloud Run service (placeholder image),
 public invoker binding, and optionally the domain mapping.
 
-## 2. OAuth client (console, one-off)
+## 2. OAuth client (console, one-off; before the full apply)
 
 1. **Google Auth Platform → Branding/Audience**: set the consent screen to
    **Internal** (Workspace users only; avoids Google verification for the

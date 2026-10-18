@@ -31,6 +31,12 @@ variable "allowed_domain" {
   default     = ""
 }
 
+variable "allowed_redirect_uris" {
+  description = "OAuth redirect URIs clients may register: exact https URIs, or \"loopback\" for local clients (Claude Code, mcp-remote). Stops a crafted login link from sending a user's code to another site."
+  type        = list(string)
+  default     = ["loopback", "https://claude.ai/api/mcp/auth_callback", "https://claude.com/api/mcp/auth_callback"]
+}
+
 variable "custom_domain" {
   description = "Hostname to map to the service (requires a verified domain)."
   type        = string

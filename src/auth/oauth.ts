@@ -5,6 +5,7 @@ import { createOAuthStore } from "./oauth-store.ts";
 import { exchangeCode } from "../google/oauth.ts";
 import { parseIdToken } from "./id-token.ts";
 import { pkceS256, randomToken } from "./tokens.ts";
+import { isAllowedRedirectUri, isValidRedirectUri } from "./redirect-uris.ts";
 import { ACCESS_TTL_MS } from "./token-store.ts";
 import type { TokenStore } from "./token-store.ts";
 import { createLogger } from "../utils/logger.ts";
@@ -25,19 +26,36 @@ export function createOAuthRouter(deps: AppDeps, tokenStore: TokenStore) {
     "/register",
     rateLimit(deps, { maxRequests: 30, windowMs: 3600000 }),
     async (c) => {
-      const body = await c.req.json();
-      const clientId = crypto.randomUUID();
+      let body: { redirect_uris?: unknown } | null = null;
+      try {
+        body = await c.req.json();
+      } catch {
+        // falls through to invalid_client_metadata
+      }
+      const uris = body?.redirect_uris;
+      if (!Array.isArray(uris) || uris.length === 0 || !uris.every(isValidRedirectUri)) {
+        logger.warn("Client registration rejected: invalid redirect_uris");
+        return c.json(
+          {
+            error: "invalid_client_metadata",
+            error_description: "redirect_uris must be a non-empty array of https or loopback http URIs",
+          },
+          400,
+        );
+      }
+      if (!uris.every((u) => isAllowedRedirectUri(u, deps.config.allowedRedirectUris))) {
+        logger.warn("Client registration rejected: redirect_uri not allowed by this server");
+        return c.json({ error: "invalid_redirect_uri", error_description: "redirect_uri is not allowed by this server" }, 400);
+      }
 
-      await oauthStore.registerClient(clientId, {
-        clientId,
-        redirectUris: body.redirect_uris || [],
-      });
+      const clientId = crypto.randomUUID();
+      await oauthStore.registerClient(clientId, { clientId, redirectUris: uris });
 
       logger.info("OAuth client registered");
 
       return c.json({
         client_id: clientId,
-        redirect_uris: body.redirect_uris || [],
+        redirect_uris: uris,
       });
     }
   );
@@ -70,9 +88,19 @@ export function createOAuthRouter(deps: AppDeps, tokenStore: TokenStore) {
       return c.json({ error: "invalid_request", error_description: "redirect_uri is required" }, 400);
     }
 
-    if (!client.redirectUris.includes(redirectUri)) {
+    if (
+      !Array.isArray(client.redirectUris) ||
+      !client.redirectUris.includes(redirectUri) ||
+      !isAllowedRedirectUri(redirectUri, deps.config.allowedRedirectUris)
+    ) {
       logger.warn("OAuth authorization failed: redirect_uri not registered for client");
       return c.json({ error: "invalid_request", error_description: "redirect_uri is not registered for this client" }, 400);
+    }
+
+    // PKCE is mandatory (OAuth 2.1, MCP authorization): S256 only.
+    if (!codeChallenge || codeChallengeMethod !== "S256") {
+      logger.warn("OAuth authorization failed: PKCE S256 required");
+      return c.json({ error: "invalid_request", error_description: "code_challenge with code_challenge_method=S256 is required" }, 400);
     }
 
     if (!state) {
@@ -210,7 +238,7 @@ export function createOAuthRouter(deps: AppDeps, tokenStore: TokenStore) {
       return c.json({ error: "invalid_grant", error_description: "redirect_uri does not match authorization request" }, 400);
     }
 
-    if (clientId && clientId !== authCodeData.clientId) {
+    if (clientId !== authCodeData.clientId) {
       logger.warn("Token exchange failed: client_id mismatch");
       return c.json({ error: "invalid_grant", error_description: "client_id does not match authorization request" }, 400);
     }

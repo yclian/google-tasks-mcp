@@ -17,6 +17,7 @@ export interface Config {
   encryptionSecret?: string;
   kmsKeyName?: string;
   allowedDomain?: string;
+  allowedRedirectUris?: string[];
   trustProxyHops?: number;
   publicPages: boolean;
   port: number;
@@ -69,6 +70,23 @@ function issuer(env: Env): string | undefined {
   return v.replace(/\/+$/, "");
 }
 
+function redirectAllowlist(env: Env): string[] | undefined {
+  const v = opt(env, "ALLOWED_REDIRECT_URIS");
+  if (v === undefined) return undefined;
+  const entries = v.split(",").map((e) => e.trim()).filter(Boolean);
+  for (const e of entries) {
+    if (e === "loopback") continue;
+    let u: URL;
+    try {
+      u = new URL(e);
+    } catch {
+      throw new ConfigError(`ALLOWED_REDIRECT_URIS entry is not a URL or "loopback" (got "${e}")`);
+    }
+    if (u.protocol !== "https:") throw new ConfigError(`ALLOWED_REDIRECT_URIS entries must be https or "loopback" (got "${e}")`);
+  }
+  return entries;
+}
+
 function proxyHops(env: Env): number | undefined {
   const v = opt(env, "TRUST_PROXY_HOPS");
   if (v === undefined) return undefined;
@@ -109,6 +127,7 @@ export function loadConfig(env: Env): Config {
     encryptionSecret: cipher === "static" ? encryptionSecret : undefined,
     kmsKeyName,
     allowedDomain: opt(env, "ALLOWED_DOMAIN")?.toLowerCase(),
+    allowedRedirectUris: redirectAllowlist(env),
     trustProxyHops: proxyHops(env),
     publicPages: bool(env, "PUBLIC_PAGES", true),
     port,

@@ -31,6 +31,7 @@ export const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 d
 export const REUSE_GRACE_MS = 60 * 1000;
 
 const grantKey = (id: string) => ["grants", id];
+const revokedKey = (id: string) => ["revoked", id];
 const byEmailKey = (email: string, id: string) => ["grants_by_email", email, id];
 const accessKey = (t: string) => ["access", hashToken(t)];
 const refreshKey = (t: string) => ["refresh", hashToken(t)];
@@ -42,10 +43,22 @@ export type TokenStore = ReturnType<typeof createTokenStore>;
 export function createTokenStore(deps: Pick<AppDeps, "store" | "cipher" | "clock">) {
   const { store, cipher, clock } = deps;
 
+  /**
+   * Store has no compare-and-set, so a write can race a revoke (read grant →
+   * revoke → write grant back). revokeGrant writes a tombstone before deleting;
+   * saveGrant writes, then checks the tombstone and undoes its own write. In
+   * every interleaving one of the two deletes runs after the write.
+   */
   async function saveGrant(grantId: string, grant: Grant): Promise<void> {
     const ttlMs = grant.expiresAt - clock();
     await store.set(grantKey(grantId), grant, { ttlMs });
     if (grant.email) await store.set(byEmailKey(grant.email, grantId), {}, { ttlMs });
+    if (await store.get(revokedKey(grantId))) await deleteGrant(grantId, grant.email);
+  }
+
+  async function deleteGrant(grantId: string, email?: string): Promise<void> {
+    await store.delete(grantKey(grantId));
+    if (email) await store.delete(byEmailKey(email, grantId));
   }
 
   async function createGrant(g: {
@@ -62,7 +75,9 @@ export function createTokenStore(deps: Pick<AppDeps, "store" | "cipher" | "clock
   }
 
   async function getGrant(grantId: string): Promise<Grant | null> {
-    return await store.get<Grant>(grantKey(grantId));
+    const grant = await store.get<Grant>(grantKey(grantId));
+    if (!grant) return null;
+    return (await store.get(revokedKey(grantId))) ? null : grant;
   }
 
   async function issuePair(grantId: string, clientId: string): Promise<TokenPair> {
@@ -82,9 +97,10 @@ export function createTokenStore(deps: Pick<AppDeps, "store" | "cipher" | "clock
   }
 
   async function revokeGrant(grantId: string): Promise<void> {
-    const grant = await getGrant(grantId);
-    await store.delete(grantKey(grantId));
-    if (grant?.email) await store.delete(byEmailKey(grant.email, grantId));
+    const grant = await store.get<Grant>(grantKey(grantId));
+    // Tombstone first (outlives any refresh token of this grant), then delete.
+    await store.set(revokedKey(grantId), { at: clock() }, { ttlMs: REFRESH_TTL_MS });
+    await deleteGrant(grantId, grant?.email);
   }
 
   /**

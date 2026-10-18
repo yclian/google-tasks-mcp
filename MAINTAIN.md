@@ -24,6 +24,7 @@
 | `ENCRYPTION_SECRET` | required for `static` | ≥ 32 chars |
 | `KMS_KEY_NAME` | — | Required with `CIPHER=gcpkms` |
 | `ALLOWED_DOMAIN` | unset (any account) | Workspace domain; checks `hd` + `email_verified` |
+| `ALLOWED_REDIRECT_URIS` | unset (any https/loopback URI) | Comma-separated exact https URIs, or `loopback`. Set it on shared deployments: otherwise anyone can register a redirect and phish a code |
 | `TRUST_PROXY_HOPS` | unset | `1` on Cloud Run (rate-limit by real client IP) |
 | `PUBLIC_PAGES` | `true` | `false` serves plain JSON, no analytics |
 | `PORT`, `LOG_LEVEL`, `ALLOWED_ORIGINS` | `3000`, `info`, unset | |

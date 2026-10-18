@@ -186,6 +186,14 @@ Changes on top of upstream:
 
 * `/authorize` rejects an unknown `client_id`, or a `redirect_uri` not in that
   client's registration, with **400 and no redirect**.
+* `/authorize` requires PKCE with `code_challenge_method=S256` (400 otherwise);
+  `/token` requires `client_id` for both grants. *(Amended after final review.)*
+* `/register` accepts only a non-empty array of https or loopback-http redirect
+  URIs (400 `invalid_client_metadata`). With `ALLOWED_REDIRECT_URIS` set, only
+  listed URIs (exact, or `loopback`) can be registered or used at `/authorize`.
+  Without it, anyone can register a redirect, so a crafted login link could
+  deliver a colleague's code to an attacker; shared deployments set it.
+  *(Amended after final review.)*
 * Scope requested from Google: `openid email https://www.googleapis.com/auth/tasks`;
   `hd` added when `ALLOWED_DOMAIN` is set.
 * `/callback` reads the `id_token` from Google's token response (received directly
@@ -249,6 +257,7 @@ decrypt.
 | `ENCRYPTION_SECRET` | required for `static` | — |
 | `KMS_KEY_NAME` | — | `projects/<project>/locations/<region>/keyRings/google-tasks-mcp/cryptoKeys/token-encryption` |
 | `ALLOWED_DOMAIN` | unset (any account) | `<domain>` |
+| `ALLOWED_REDIRECT_URIS` | unset (any https/loopback URI) | `loopback,https://claude.ai/api/mcp/auth_callback,https://claude.com/api/mcp/auth_callback` |
 | `TRUST_PROXY_HOPS` | unset | `1` |
 | `PUBLIC_PAGES` | `true` | `false` |
 | `PORT`, `LOG_LEVEL`, `ALLOWED_ORIGINS` | as upstream | `8080`, `info`, unset |
