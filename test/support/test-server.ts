@@ -7,6 +7,7 @@ import { DenoKvStore } from "../../src/store/denokv.ts";
 import { StaticCipher } from "../../src/crypto/static.ts";
 import { TestClock } from "./clock.ts";
 import { GoogleFake } from "./google-fake.ts";
+import { recordingFetch, track, type ServerRecord } from "./invariants.ts";
 import {
   PLANTED_GOOGLE_CLIENT_CREDENTIAL,
   PLANTED_GOOGLE_CLIENT_ID,
@@ -45,5 +46,10 @@ export async function startTestServer(
     cipher: overrides.cipher ?? new StaticCipher(config.encryptionSecret ?? PLANTED_KEY_MATERIAL),
     fetch: overrides.fetch ?? google.fetch,
   };
-  return { app: createApp(deps), deps, clock, google };
+  const app = createApp(deps);
+  // Every request through this app is recorded for the invariants (§11.8).
+  const rec: ServerRecord = { store: deps.store, responses: [], secrets: new Set() };
+  track(rec);
+  const recorded = recordingFetch((req) => app.fetch(req), rec);
+  return { app: { fetch: recorded } as unknown as typeof app, deps, clock, google };
 }
