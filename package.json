@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.test.json",
-    "start": "node build/node.js"
+    "start": "node build/node.js",
+    "revoke": "node build/cli/revoke.js"
   },
   "keywords": [
     "mcp",
