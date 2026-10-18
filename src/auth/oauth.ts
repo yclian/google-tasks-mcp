@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import crypto from "node:crypto";
 import type { AppDeps } from "../deps.ts";
 import { createOAuthStore } from "./oauth-store.ts";
+import { exchangeCode } from "../google/oauth.ts";
 import type { TokenStore } from "./token-store.ts";
 import { createLogger } from "../utils/logger.ts";
 import { rateLimit } from "../server/rate-limiter.ts";
@@ -10,7 +11,6 @@ import { rateLimit } from "../server/rate-limiter.ts";
 const logger = createLogger({ component: "oauth" });
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 export interface OAuthConfig {
   clientId: string;
@@ -183,33 +183,14 @@ export function createOAuthRouter(deps: AppDeps, tokenStore: TokenStore) {
     }
 
     try {
-      const tokenResponse = await deps.fetch(GOOGLE_TOKEN_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          code: authCodeData.googleCode,
-          client_id: config.clientId,
-          client_secret: config.clientSecret,
-          redirect_uri: config.redirectUri,
-          grant_type: "authorization_code",
-        }),
-      });
-
-      const tokenData = await tokenResponse.json();
-
-      if (!tokenResponse.ok) {
-        logger.error("Google token exchange failed", { status: tokenResponse.status });
-        return c.json({ error: "server_error", error_description: "Failed to exchange Google token" }, 500);
-      }
+      const google = await exchangeCode(deps, authCodeData.googleCode);
 
       const mcpToken = crypto.randomUUID();
 
       await tokenStore.storeTokens(mcpToken, {
-        googleAccessToken: tokenData.access_token,
-        googleRefreshToken: tokenData.refresh_token,
-        expiresAt: deps.clock() + tokenData.expires_in * 1000,
+        googleAccessToken: google.accessToken,
+        googleRefreshToken: google.refreshToken,
+        expiresAt: deps.clock() + google.expiresIn * 1000,
       });
 
       await oauthStore.deleteAuthCode(code);
@@ -231,44 +212,4 @@ export function createOAuthRouter(deps: AppDeps, tokenStore: TokenStore) {
   );
 
   return oauth;
-}
-
-export async function refreshGoogleToken(
-  refreshToken: string,
-  config: OAuthConfig,
-  fetchFn: typeof fetch,
-): Promise<{
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-}> {
-  logger.info("Refreshing Google access token");
-
-  const tokenResponse = await fetchFn(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      refresh_token: refreshToken,
-      client_id: config.clientId,
-      client_secret: config.clientSecret,
-      grant_type: "refresh_token",
-    }),
-  });
-
-  const tokenData = await tokenResponse.json();
-
-  if (!tokenResponse.ok) {
-    logger.error("Google token refresh failed");
-    throw new Error(`Failed to refresh Google token: ${tokenData.error}`);
-  }
-
-  logger.info("Token refresh completed successfully");
-
-  return {
-    accessToken: tokenData.access_token,
-    refreshToken: tokenData.refresh_token || refreshToken,
-    expiresIn: tokenData.expires_in,
-  };
 }

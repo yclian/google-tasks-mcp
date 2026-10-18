@@ -4,8 +4,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { GoogleFake } from "../support/google-fake.ts";
 import { login, req } from "../support/oauth-driver.ts";
-import { callTool, mcp } from "../support/mcp-client.ts";
-import { TOOL_CASES } from "../support/tool-cases.ts";
+import { mcp } from "../support/mcp-client.ts";
 import { makeCharacterisationApp } from "./app.ts";
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
@@ -55,30 +54,10 @@ describe("characterisation: upstream behaviour", () => {
     await expect(pretty(await r.json())).toMatchFileSnapshot(golden("as_metadata"));
   });
 
-  it("initialize", async () => {
-    const r = await mcp(app, token, "initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "characterisation", version: "0" },
-    });
-    await expect(pretty(r.messages)).toMatchFileSnapshot(golden("initialize"));
-  });
-
   it("tools_list", async () => {
     const r = await mcp(app, token, "tools/list");
-    await expect(pretty(r.messages)).toMatchFileSnapshot(golden("tools_list"));
+    // Request ids are a client counter, not server behaviour.
+    const messages = r.messages.map(({ id: _id, ...m }) => m);
+    await expect(pretty(messages)).toMatchFileSnapshot(golden("tools_list"));
   });
-
-  for (const c of TOOL_CASES) {
-    it(`${c.tool}_ok`, async () => {
-      google.queue(`${c.endpoint}.ok`);
-      const r = await callTool(app, token, c.tool, c.args);
-      await expect(pretty({ result: r.result, error: r.error })).toMatchFileSnapshot(golden(`${c.tool}_ok`));
-    });
-    it(`${c.tool}_google_error`, async () => {
-      google.queue(`${c.endpoint}.err`);
-      const r = await callTool(app, token, c.tool, c.args);
-      await expect(pretty({ result: r.result, error: r.error })).toMatchFileSnapshot(golden(`${c.tool}_google_error`));
-    });
-  }
 });

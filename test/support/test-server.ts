@@ -1,10 +1,10 @@
 // Builds a real app (no src/ mocks) over an in-memory store, a test clock and
 // the Google fake. Pass `store` to share state between instances.
-import process from "node:process";
 import { createApp } from "../../src/server/app.ts";
 import type { AppDeps } from "../../src/deps.ts";
 import { type Config, loadConfig } from "../../src/config.ts";
 import { DenoKvStore } from "../../src/store/denokv.ts";
+import { StaticCipher } from "../../src/crypto/static.ts";
 import { TestClock } from "./clock.ts";
 import { GoogleFake } from "./google-fake.ts";
 import {
@@ -35,13 +35,14 @@ export function testConfig(env: Record<string, string | undefined> = {}): Config
 export async function startTestServer(
   overrides: Partial<Omit<AppDeps, "clock">> & { clock?: TestClock; google?: GoogleFake; env?: Record<string, string | undefined> } = {},
 ): Promise<TestServer> {
-  process.env.ENCRYPTION_SECRET ??= PLANTED_KEY_MATERIAL;
   const clock = overrides.clock ?? new TestClock();
   const google = overrides.google ?? new GoogleFake();
+  const config = overrides.config ?? testConfig(overrides.env);
   const deps: AppDeps = {
     store: overrides.store ?? (await DenoKvStore.open({ clock: clock.now })),
     clock: clock.now,
-    config: overrides.config ?? testConfig(overrides.env),
+    config,
+    cipher: overrides.cipher ?? new StaticCipher(config.encryptionSecret ?? PLANTED_KEY_MATERIAL),
     fetch: overrides.fetch ?? google.fetch,
   };
   return { app: createApp(deps), deps, clock, google };

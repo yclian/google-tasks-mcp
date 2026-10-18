@@ -1,5 +1,4 @@
 import type { AppDeps } from "../deps.ts";
-import { encrypt, decrypt } from "../utils/encryption.ts";
 
 export interface TokenData {
   googleAccessToken: string;
@@ -17,13 +16,13 @@ const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export type TokenStore = ReturnType<typeof createTokenStore>;
 
-export function createTokenStore(deps: Pick<AppDeps, "store">) {
-  const { store } = deps;
+export function createTokenStore(deps: Pick<AppDeps, "store" | "cipher">) {
+  const { store, cipher } = deps;
 
   async function storeTokens(mcpToken: string, tokenData: TokenData): Promise<void> {
     const encryptedData: EncryptedTokenData = {
-      encryptedAccessToken: encrypt(tokenData.googleAccessToken),
-      encryptedRefreshToken: encrypt(tokenData.googleRefreshToken),
+      encryptedAccessToken: await cipher.encrypt(tokenData.googleAccessToken),
+      encryptedRefreshToken: await cipher.encrypt(tokenData.googleRefreshToken),
       expiresAt: tokenData.expiresAt,
     };
     await store.set(["tokens", mcpToken], encryptedData, { ttlMs: TTL_MS });
@@ -35,8 +34,8 @@ export function createTokenStore(deps: Pick<AppDeps, "store">) {
       return null;
     }
     return {
-      googleAccessToken: decrypt(value.encryptedAccessToken),
-      googleRefreshToken: decrypt(value.encryptedRefreshToken),
+      googleAccessToken: await cipher.decrypt(value.encryptedAccessToken),
+      googleRefreshToken: await cipher.decrypt(value.encryptedRefreshToken),
       expiresAt: value.expiresAt,
     };
   }

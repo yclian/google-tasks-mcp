@@ -1,8 +1,8 @@
-import type { ApiAuth } from "../google/api.ts";
+import type { GoogleClient } from "../google/client.ts";
 import { registerTaskListsTools } from "./tasklists.ts";
 import { registerTasksTools } from "./tasks.ts";
 
-export function registerAllTools(server: any, mcpAccessToken: ApiAuth) {
-  registerTaskListsTools(server, mcpAccessToken);
-  registerTasksTools(server, mcpAccessToken);
+export function registerAllTools(server: any, client: GoogleClient) {
+  registerTaskListsTools(server, client);
+  registerTasksTools(server, client);
 }

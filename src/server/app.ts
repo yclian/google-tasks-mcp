@@ -5,7 +5,7 @@ import { createOAuthRouter } from "../auth/oauth.ts";
 import { createTokenStore } from "../auth/token-store.ts";
 import type { AppDeps } from "../deps.ts";
 import { authenticateBearer } from "./middleware.ts";
-import { handleMcpGet, handleMcpPost } from "./mcp-endpoints.ts";
+import { handleMcpMethodNotAllowed, handleMcpPost } from "./mcp-endpoints.ts";
 
 const MCP_ENDPOINT = "/mcp";
 
@@ -49,8 +49,8 @@ export function createApp(deps: AppDeps) {
 
       return null;
     },
-    allowMethods: ["GET", "POST", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "Mcp-Session-Id", "Accept"],
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization", "Mcp-Session-Id", "Mcp-Protocol-Version", "Accept"],
     exposeHeaders: ["Mcp-Session-Id", "Content-Type"],
     credentials: false,
     maxAge: 86400,
@@ -74,8 +74,9 @@ export function createApp(deps: AppDeps) {
     return c.redirect(url.toString());
   });
 
-  app.get(MCP_ENDPOINT, requireBearer, handleMcpGet);
   app.post(MCP_ENDPOINT, requireBearer, handleMcpPost(deps, tokenStore));
+  app.get(MCP_ENDPOINT, requireBearer, handleMcpMethodNotAllowed);
+  app.delete(MCP_ENDPOINT, requireBearer, handleMcpMethodNotAllowed);
 
   app.get("/.well-known/oauth-authorization-server", (c) => {
     const baseUrl = new URL(c.req.url).origin;
