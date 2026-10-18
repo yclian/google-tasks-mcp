@@ -85,4 +85,14 @@ describe("addReadableTimestamps", () => {
       }),
     );
   });
+
+  it("proto_key_copied_as_data", () => {
+    // Found by original_fields_unchanged: JSON.parse yields an own "__proto__"
+    // key, which plain assignment would turn into the result's prototype.
+    const input = JSON.parse('{"title":"t","__proto__":{"polluted":true}}');
+    const out = addReadableTimestamps(input);
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(Object.prototype.hasOwnProperty.call(out, "__proto__")).toBe(true);
+    expect((out as { polluted?: boolean }).polluted).toBeUndefined();
+  });
 });
