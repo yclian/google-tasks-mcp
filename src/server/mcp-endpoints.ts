@@ -32,6 +32,9 @@ export const handleMcpPost = (_deps: AppDeps, google: GoogleTokenProvider) => as
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
   });
+  // The transport answers bad requests (e.g. an unsupported protocol version)
+  // with a 400 and reports why only here.
+  transport.onerror = (error) => logger.warn("MCP request rejected", { reason: String(error) });
 
   try {
     await server.connect(transport);

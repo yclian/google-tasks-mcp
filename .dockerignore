@@ -10,3 +10,4 @@ infra
 *.md
 *.log
 .env
+client_secret_*.json

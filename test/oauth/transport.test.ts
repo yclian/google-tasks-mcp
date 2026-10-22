@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { startTestServer } from "../support/test-server.ts";
 import { login, req } from "../support/oauth-driver.ts";
 import { callTool, mcp, mcpRaw } from "../support/mcp-client.ts";
+import { logs } from "../support/invariants.ts";
 
 const TOOL_NAMES = [
   "list_task_lists", "get_task_list", "insert_task_list", "update_task_list", "patch_task_list", "delete_task_list",
@@ -58,5 +59,15 @@ describe("transport", () => {
       expect(r.status, method).toBe(405);
       await r.text();
     }
+  });
+
+  it("transport_rejection_reason_is_logged", async () => {
+    const s = await startTestServer();
+    const { tokens } = await login(s.app, s.google);
+    const r = await mcp(s.app, tokens.access_token, "tools/list");
+    expect(r.status).toBe(200);
+    const bad = await mcpRaw(s.app, tokens.access_token, { jsonrpc: "2.0", id: 1, method: "tools/list" }, { "mcp-protocol-version": "1999-01-01" });
+    expect(bad.status).toBe(400);
+    expect(logs.some((l) => l.includes("MCP request rejected") && l.includes("Unsupported protocol version: 1999-01-01"))).toBe(true);
   });
 });

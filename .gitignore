@@ -13,3 +13,6 @@ infra/backend.hcl
 infra/.terraform/
 infra/.terraform.lock.hcl
 infra/*.tfstate*
+
+# Google OAuth client downloads (credentials go to Secret Manager, never git)
+client_secret_*.json
