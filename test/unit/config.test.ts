@@ -61,6 +61,11 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...base, PUBLIC_PAGES: "false" }).publicPages).toBe(false);
     expect(loadConfig({ ...base, PUBLIC_PAGES: "true" }).publicPages).toBe(true);
     expect(() => loadConfig({ ...base, PUBLIC_PAGES: "nope" })).toThrow(/PUBLIC_PAGES/);
+    expect(loadConfig({ ...base, PUBLIC_PAGES: "auto" }).publicPages).toBe("auto");
+    expect(loadConfig(base).analytics).toBe(true);
+    expect(loadConfig({ ...base, ANALYTICS: "false" }).analytics).toBe(false);
+    expect(loadConfig({ ...base, PRIVACY_POLICY_URL: "https://example.com/p" }).privacyPolicyUrl).toBe("https://example.com/p");
+    expect(() => loadConfig({ ...base, PRIVACY_POLICY_URL: "http://example.com/p" })).toThrow(/PRIVACY_POLICY_URL/);
   });
 
   it("unknown_storage_rejected", () => {

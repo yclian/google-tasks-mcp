@@ -37,6 +37,22 @@ variable "allowed_redirect_uris" {
   default     = ["loopback", "https://claude.ai/api/mcp/auth_callback", "https://claude.com/api/mcp/auth_callback"]
 }
 
+variable "public_pages" {
+  description = "\"auto\": landing page for browsers, JSON for everything else; \"false\": JSON only; \"true\": HTML always."
+  type        = string
+  default     = "auto"
+  validation {
+    condition     = contains(["auto", "true", "false"], var.public_pages)
+    error_message = "public_pages must be \"auto\", \"true\" or \"false\"."
+  }
+}
+
+variable "privacy_policy_url" {
+  description = "Your organisation's privacy policy; /privacy-policy redirects there. Leave empty to serve the bundled page, which describes the upstream project's hosted service."
+  type        = string
+  default     = ""
+}
+
 variable "custom_domain" {
   description = "Hostname to map to the service (requires a verified domain)."
   type        = string

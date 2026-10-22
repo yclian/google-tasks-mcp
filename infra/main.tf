@@ -168,7 +168,7 @@ resource "google_cloud_run_v2_service" "svc" {
       }
 
       dynamic "env" {
-        for_each = {
+        for_each = merge({
           GOOGLE_REDIRECT_URI   = "${var.issuer_url}/callback"
           ISSUER_URL            = var.issuer_url
           STORAGE               = "firestore"
@@ -178,9 +178,10 @@ resource "google_cloud_run_v2_service" "svc" {
           ALLOWED_DOMAIN        = var.allowed_domain
           ALLOWED_REDIRECT_URIS = join(",", var.allowed_redirect_uris)
           TRUST_PROXY_HOPS      = "1"
-          PUBLIC_PAGES          = "false"
+          PUBLIC_PAGES          = var.public_pages
+          ANALYTICS             = "false" # never report a shared server's visitors to upstream's analytics
           LOG_LEVEL             = "info"
-        }
+        }, var.privacy_policy_url == "" ? {} : { PRIVACY_POLICY_URL = var.privacy_policy_url })
         content {
           name  = env.key
           value = env.value

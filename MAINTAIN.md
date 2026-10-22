@@ -26,7 +26,9 @@
 | `ALLOWED_DOMAIN` | unset (any account) | Workspace domain; checks `hd` + `email_verified` |
 | `ALLOWED_REDIRECT_URIS` | unset (any https/loopback URI) | Comma-separated exact https URIs, or `loopback`. Set it on shared deployments: otherwise anyone can register a redirect and phish a code |
 | `TRUST_PROXY_HOPS` | unset | `1` on Cloud Run (rate-limit by real client IP) |
-| `PUBLIC_PAGES` | `true` | `false` serves plain JSON, no analytics |
+| `PUBLIC_PAGES` | `true` | `true` serves the HTML pages, `false` plain JSON, `auto` HTML to browsers (`Accept: text/html`) and JSON to everything else |
+| `ANALYTICS` | `true` | `false` strips the pages' Google Analytics tag and drops it from the CSP. Set it on your own deployment: the tag reports to the upstream project |
+| `PRIVACY_POLICY_URL` | unset | https URL; `/privacy-policy` redirects there instead of serving the bundled page |
 | `PORT`, `LOG_LEVEL`, `ALLOWED_ORIGINS` | `3000`, `info`, unset | |
 
 Startup fails fast on an invalid combination.

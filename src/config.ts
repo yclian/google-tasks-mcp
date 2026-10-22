@@ -19,7 +19,9 @@ export interface Config {
   allowedDomain?: string;
   allowedRedirectUris?: string[];
   trustProxyHops?: number;
-  publicPages: boolean;
+  publicPages: boolean | "auto";
+  analytics: boolean;
+  privacyPolicyUrl?: string;
   port: number;
   allowedOrigins: string[];
 }
@@ -52,6 +54,25 @@ function bool(env: Env, name: string, fallback: boolean): boolean {
   if (v === "true") return true;
   if (v === "false") return false;
   throw new ConfigError(`${name} must be "true" or "false" (got "${v}")`);
+}
+
+// "auto": HTML for browsers (Accept: text/html), JSON for everything else.
+function pages(env: Env): boolean | "auto" {
+  const v = oneOf(env, "PUBLIC_PAGES", ["true", "false", "auto"] as const, "true");
+  return v === "auto" ? "auto" : v === "true";
+}
+
+function httpsUrl(env: Env, name: string): string | undefined {
+  const v = opt(env, name);
+  if (v === undefined) return undefined;
+  let u: URL;
+  try {
+    u = new URL(v);
+  } catch {
+    throw new ConfigError(`${name} must be a URL (got "${v}")`);
+  }
+  if (u.protocol !== "https:") throw new ConfigError(`${name} must be an https URL`);
+  return v;
 }
 
 function issuer(env: Env): string | undefined {
@@ -129,7 +150,9 @@ export function loadConfig(env: Env): Config {
     allowedDomain: opt(env, "ALLOWED_DOMAIN")?.toLowerCase(),
     allowedRedirectUris: redirectAllowlist(env),
     trustProxyHops: proxyHops(env),
-    publicPages: bool(env, "PUBLIC_PAGES", true),
+    publicPages: pages(env),
+    analytics: bool(env, "ANALYTICS", true),
+    privacyPolicyUrl: httpsUrl(env, "PRIVACY_POLICY_URL"),
     port,
     allowedOrigins: (opt(env, "ALLOWED_ORIGINS") ?? "").split(",").map((o) => o.trim()).filter(Boolean),
   };

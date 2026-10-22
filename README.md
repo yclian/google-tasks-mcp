@@ -299,6 +299,8 @@ Configure your MCP client with the following connection details:
 | `ISSUER_URL` | No | Public base URL; set it behind a proxy or load balancer |
 | `ALLOWED_DOMAIN` | No | Only accept accounts from this Google Workspace domain |
 | `ALLOWED_REDIRECT_URIS` | No | Allowlist of client redirect URIs; set it on shared servers |
+| `PUBLIC_PAGES` | No | `true` (HTML pages), `false` (JSON only) or `auto` (HTML for browsers, JSON otherwise) |
+| `ANALYTICS`, `PRIVACY_POLICY_URL` | No | Drop the pages' analytics tag; redirect `/privacy-policy` to your own policy |
 | `STORAGE`, `CIPHER` | No | `firestore` and `gcpkms` for the Google Cloud mode (see [MAINTAIN.md](MAINTAIN.md)) |
 
 The full list, including the Google Cloud settings, is in [MAINTAIN.md](MAINTAIN.md#configuration).

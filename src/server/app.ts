@@ -63,16 +63,25 @@ export function createApp(deps: AppDeps) {
     maxAge: 86400,
   }));
 
-  const publicPages = deps.config.publicPages;
+  const { publicPages, analytics, privacyPolicyUrl } = deps.config;
+  const pageCsp = analytics
+    ? "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' https://www.googletagmanager.com; connect-src https://www.google-analytics.com; frame-ancestors 'none'"
+    : "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'";
+  // PUBLIC_PAGES=auto serves the HTML pages only to clients that ask for HTML.
+  const wantsHtml = (c: Context) =>
+    publicPages === true || (publicPages === "auto" && (c.req.header("accept") ?? "").includes("text/html"));
+  const page = async (c: Context, file: string) => {
+    const html = await readFile(file, "utf-8");
+    c.header("Content-Security-Policy", pageCsp);
+    return c.html(analytics ? html : stripAnalytics(html));
+  };
 
   app.get("/", async (c) => {
-    if (!publicPages) {
+    if (!wantsHtml(c)) {
       return c.json({ message: "Google Tasks MCP Server" });
     }
     try {
-      const html = await readFile("./public/index.html", "utf-8");
-      c.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' https://www.googletagmanager.com; connect-src https://www.google-analytics.com; frame-ancestors 'none'");
-      return c.html(html);
+      return await page(c, "./public/index.html");
     } catch {
       return c.json({ message: "Google Tasks MCP Server" });
     }
@@ -127,26 +136,25 @@ export function createApp(deps: AppDeps) {
   });
 
   app.get("/privacy-policy", async (c) => {
-    if (!publicPages) {
+    if (privacyPolicyUrl) {
+      return c.redirect(privacyPolicyUrl);
+    }
+    if (!wantsHtml(c)) {
       return c.notFound();
     }
     try {
-      const html = await readFile("./public/privacy-policy.html", "utf-8");
-      c.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' https://www.googletagmanager.com; connect-src https://www.google-analytics.com; frame-ancestors 'none'");
-      return c.html(html);
+      return await page(c, "./public/privacy-policy.html");
     } catch {
       return c.notFound();
     }
   });
 
   app.get("/health", async (c) => {
-    if (!publicPages) {
+    if (!wantsHtml(c)) {
       return c.json({ status: "ok" });
     }
     try {
-      const html = await readFile("./public/health.html", "utf-8");
-      c.header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' https://www.googletagmanager.com; connect-src https://www.google-analytics.com; frame-ancestors 'none'");
-      return c.html(html);
+      return await page(c, "./public/health.html");
     } catch {
       return c.json({ status: "ok" });
     }
@@ -165,4 +173,11 @@ export function createApp(deps: AppDeps) {
   });
 
   return app;
+}
+
+/** Drops the pages' Google Analytics tag (ANALYTICS=false). */
+export function stripAnalytics(html: string): string {
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, (tag) => (/googletagmanager|gtag\(/.test(tag) ? "" : tag))
+    .replace(/<!--\s*Google tag \(gtag\.js\)\s*-->/g, "");
 }
