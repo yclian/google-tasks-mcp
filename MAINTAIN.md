@@ -41,6 +41,26 @@ Startup fails fast on an invalid combination.
 - If Google refuses a refresh (user removed access, account suspended), the grant
   is deleted and the client is asked to sign in again.
 
+## Upgrading an existing deployment
+
+- **Everyone reconnects once.** Our tokens are now stored under SHA-256 hashes,
+  so tokens issued by an older version are no longer found: clients get a 401
+  and sign in again. Keep the same `ENCRYPTION_SECRET`; the stored Google token
+  format is unchanged.
+- **Clients must use PKCE (S256)** and register their redirect URI. Claude and
+  `mcp-remote` already do.
+- **Deno Deploy keeps working** with the same environment variables; nothing new
+  is required.
+
+## Logs worth knowing
+
+| Log line | Meaning |
+|----------|---------|
+| `MCP request rejected` (with `reason`) | The MCP transport answered 400, e.g. an unsupported protocol version |
+| `Google refused the refresh token; revoking grant` | The user removed access or the account was suspended; they sign in again |
+| `Client registration rejected: redirect_uri not allowed` | `ALLOWED_REDIRECT_URIS` blocked a client |
+| `Authentication failed: missing or invalid Authorization header` | Normal when a client's access token expires; it refreshes and retries |
+
 ## Revoking access (kill switch)
 
 Run with the same environment as the service and credentials that can read

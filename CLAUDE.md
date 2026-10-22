@@ -11,7 +11,7 @@ Google Tasks MCP Server — an open-source Model Context Protocol server that le
 - **Build**: `npm run build` (runs `tsc`)
 - **Dev (watch)**: `npm run dev` (runs `tsc --watch`)
 - **Lint**: `deno lint` (configured in `deno.json`, targets `src/`)
-- **Run**: `deno task dev` (Deno, `build/index.js`) or `npm start` (Node, `build/node.js`; set `KV_PATH`)
+- **Run**: `deno task dev` (`deno serve` on :3000, `build/index.js`; `@deno/kv` needs `--allow-ffi`/`--allow-sys`) or `npm start` (Node, `build/node.js`; set `KV_PATH`)
 - **Revoke access**: `npm run revoke -- --email <addr> | --all [--dry-run]`
 - **Generate encryption secret**: `npm run generate-secret`
 
